@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Untangle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F1ECE2;
+    --card: #FAF7F0;
+    --ink: #262420;
+    --ink-soft: #6E6A5F;
+    --moss: #33513C;
+    --moss-soft: #5C7A63;
+    --moss-pale: #E4EAE2;
+    --amber: #B8862F;
+    --line: #DDD6C6;
+    --danger: #A8472F;
+    --danger-pale: #F3E4DE;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+  }
+  .shell{max-width:600px;margin:0 auto;padding:0 16px 64px;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:22px 0 18px;
+  }
+  .wordmark{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-style:italic;
+    font-size:22px;
+    color:var(--moss);
+  }
+  .plan-pill{
+    display:flex;align-items:center;gap:7px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:100px;
+    padding:6px 13px;
+    font-size:13px;
+    font-weight:500;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .plan-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--moss-soft);}
+  .plan-pill.premium .dot{background:var(--amber);}
+  .plan-pill .num{font-family:'IBM Plex Mono', monospace;font-weight:500;color:var(--ink);}
+
+  /* ---------- Email gate (overlay) ---------- */
+  .gate-overlay{
+    position:fixed;inset:0;background:rgba(38,36,32,0.45);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;z-index:50;
+  }
+  .gate-card{
+    background:var(--card);
+    border-radius:18px;
+    padding:32px 28px;
+    max-width:380px;width:100%;
+    text-align:center;
+  }
+  .gate-card h2{
+    font-family:'Fraunces', serif;font-weight:600;font-size:22px;
+    margin:0 0 8px;
+  }
+  .gate-card p{color:var(--ink-soft);font-size:14.5px;line-height:1.5;margin:0 0 20px;}
+  .gate-card input{
+    width:100%;padding:12px 14px;border-radius:10px;
+    border:1.5px solid var(--line);background:var(--paper);
+    font-family:'Inter',sans-serif;font-size:15px;margin-bottom:12px;
+  }
+  .gate-card input:focus{outline:none;border-color:var(--moss);}
+
+  /* ---------- Buttons ---------- */
+  button{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:14.5px;
+    border:none;
+    border-radius:11px;
+    padding:12px 20px;
+    cursor:pointer;
+    transition:transform .1s ease, opacity .15s ease;
+  }
+  button:active{transform:scale(0.97);}
+  .btn-primary{background:var(--moss);color:#fff;width:100%;}
+  .btn-primary:disabled{opacity:0.5;cursor:default;}
+  .btn-text{background:transparent;color:var(--ink-soft);padding:8px 4px;font-weight:500;}
+  .btn-text:hover{color:var(--ink);}
+  .btn-amber{background:var(--amber);color:#fff;}
+
+  /* ---------- Dump card ---------- */
+  .dump-card{
+    background:var(--card);
+    border-radius:18px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .dump-card h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;font-style:italic;
+    font-size:23px;
+    margin:0 0 4px;
+    line-height:1.25;
+  }
+  .dump-card .sub{color:var(--ink-soft);font-size:14px;margin:0 0 16px;}
+  textarea{
+    width:100%;min-height:104px;resize:vertical;
+    border:1.5px solid var(--line);border-radius:12px;
+    background:var(--paper);padding:13px 14px;
+    font-family:'Inter', sans-serif;font-size:15px;color:var(--ink);
+    line-height:1.5;
+  }
+  textarea:focus{outline:none;border-color:var(--moss);}
+  textarea::placeholder{color:#9C967F;}
+
+  .dump-actions{display:flex;justify-content:flex-end;margin-top:12px;}
+  .dump-actions button{width:auto;padding:11px 22px;}
+
+  .status-line{
+    display:flex;align-items:center;gap:8px;
+    font-size:13px;color:var(--moss-soft);
+    margin-top:12px;min-height:18px;
+  }
+  .status-line.error{color:var(--danger);}
+  .spinner{
+    width:13px;height:13px;border-radius:50%;
+    border:2px solid var(--moss-soft);border-top-color:transparent;
+    animation:spin .7s linear infinite;flex:none;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---------- Upgrade banner ---------- */
+  .upgrade-banner{
+    display:none;
+    background:var(--danger-pale);
+    border-radius:14px;
+    padding:16px 18px;
+    margin-bottom:16px;
+    align-items:center;justify-content:space-between;
+    gap:14px;flex-wrap:wrap;
+  }
+  .upgrade-banner p{margin:0;font-size:14px;color:var(--ink);flex:1;min-width:180px;}
+  .upgrade-banner strong{display:block;font-size:15px;margin-bottom:2px;}
+
+  /* ---------- Tree panel ---------- */
+  .tree-card{background:var(--card);border-radius:18px;padding:20px;}
+  .tree-card h2{
+    font-family:'Fraunces', serif;font-weight:600;font-size:16.5px;
+    margin:0 0 12px;
+  }
+  .progress-track{
+    height:6px;border-radius:100px;background:var(--moss-pale);
+    overflow:hidden;margin-bottom:16px;
+  }
+  .progress-fill{height:100%;background:var(--moss);border-radius:100px;transition:width .3s ease;}
+  .progress-label{
+    display:flex;justify-content:space-between;
+    font-size:12.5px;color:var(--ink-soft);margin:-11px 0 16px;
+  }
+
+  .empty{color:var(--ink-soft);font-size:14.5px;text-align:center;padding:26px 0;line-height:1.6;}
+
+  ul.tree{list-style:none;margin:0;padding-left:0;}
+  ul.tree ul.tree{padding-left:22px;border-left:1.5px solid var(--line);margin-left:9px;margin-top:2px;}
+
+  li.node{position:relative;margin:1px 0;}
+  .node-row{display:flex;align-items:flex-start;gap:7px;padding:6px;border-radius:9px;}
+  .node-row:hover{background:var(--moss-pale);}
+
+  .twisty{
+    width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--moss-soft);font-size:11px;margin-top:2px;user-select:none;
+  }
+  .twisty.leafless{visibility:hidden;}
+
+  .checkbox{
+    flex:none;width:19px;height:19px;margin-top:1px;
+    border-radius:6px;border:1.5px solid var(--moss-soft);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;font-size:12px;background:var(--card);color:#fff;
+  }
+  .checkbox.checked{background:var(--moss);border-color:var(--moss);}
+
+  .node-text{flex:1;font-size:14.5px;line-height:1.45;padding-top:1px;outline:none;word-break:break-word;}
+  .node-text.checked{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--moss-soft);}
+
+  .node-actions{display:flex;gap:2px;flex:none;opacity:0;transition:opacity .12s ease;}
+  .node-row:hover .node-actions{opacity:1;}
+  .icon-btn{
+    width:22px;height:22px;border:none;background:transparent;
+    color:var(--ink-soft);cursor:pointer;font-size:14px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:hover{background:var(--line);color:var(--ink);}
+
+  .bottom-row{display:flex;gap:16px;justify-content:center;margin-top:16px;}
+  footer{text-align:center;font-size:12px;color:var(--ink-soft);margin-top:22px;}
+</style>
+</head>
+<body>
+
+<div id="gateOverlay" class="gate-overlay">
+  <div class="gate-card">
+    <h2>Let's get you set up</h2>
+    <p>Just your email — this is how we keep track of your plan, nothing else.</p>
+    <input type="email" id="emailInput" placeholder="you@example.com">
+    <button class="btn-primary" id="saveEmailBtn">Continue</button>
+  </div>
+</div>
+
+<div class="shell">
+  <div class="topbar">
+    <div class="wordmark">Untangle</div>
+    <div class="plan-pill" id="planPill" title="Click to switch account">
+      <span class="dot"></span><span id="planPillText">Loading…</span>
+    </div>
+  </div>
+
+  <div class="dump-card">
+    <h1>Empty your head here</h1>
+    <p class="sub">Write it all down, in any order. We'll sort it into something you can actually act on.</p>
+    <textarea id="dumpBox" placeholder="call dentist, finish deck for Thursday, groceries, fix leaking tap, email Sam back, book flights, laundry, renew passport..."></textarea>
+    <div class="dump-actions">
+      <button class="btn-primary" id="organizeBtn" style="width:auto;">Organize it</button>
+    </div>
+    <div class="status-line" id="status" style="display:none;"></div>
+  </div>
+
+  <div class="upgrade-banner" id="upgradeBanner">
+    <p><strong>You've used all your free organizes</strong>Upgrade for unlimited use.</p>
+    <button class="btn-amber" id="upgradeBtn">Upgrade — ₹399</button>
+  </div>
+
+  <div class="tree-card">
+    <h2>Your plan</h2>
+    <div id="progressWrap" style="display:none;">
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%;"></div></div>
+      <div class="progress-label"><span id="progressText"></span></div>
+    </div>
+    <div id="treeRoot"></div>
+  </div>
+
+  <div class="bottom-row">
+    <button class="btn-text" id="addRootBtn">+ Add manually</button>
+    <button class="btn-text" id="resetAllBtn">Clear everything</button>
+  </div>
+
+  <footer>Saved on this device · backend at <code>localhost:5000</code></footer>
+</div>
+
+<script>
+// 👇 PASTE YOUR RENDER URL HERE after deploying backend.py (see DEPLOYMENT.md)
+//    e.g. 'https://untangle-backend.onrender.com'  — no trailing slash
+const BACKEND_BASE = 'http://localhost:5000';
+
+// 👇 PASTE YOUR RAZORPAY PAYMENT LINK HERE after creating it (see DEPLOYMENT.md)
+//    e.g. 'https://rzp.io/rzp/abcXYZ12'
+const RAZORPAY_PAYMENT_LINK = 'PASTE_YOUR_RAZORPAY_PAYMENT_LINK_HERE';
+
+const STORAGE_KEY = 'untangleTree';
+const EMAIL_KEY = 'untangleEmail';
+
+let tree = [];
+let idCounter = 1;
+
+function newId(){ return 'n' + (idCounter++) + '_' + Math.random().toString(36).slice(2,7); }
+function getEmail(){ return localStorage.getItem(EMAIL_KEY) || ''; }
+
+function makeNode(text, children){
+  return { id: newId(), text: text, checked: false, expanded: true, children: (children||[]).map(c => makeNode(c.text, c.children)) };
+}
+
+/* ---------------- Local tree storage (unchanged: stays client-side) ---------------- */
+
+function loadTree(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) tree = JSON.parse(raw);
+  }catch(e){ tree = []; }
+  render();
+}
+function saveTree(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); }catch(e){ console.error('save failed', e); }
+}
+function countStats(nodes){
+  let total=0, done=0;
+  for(const n of nodes){
+    total++; if(n.checked) done++;
+    if(n.children && n.children.length){ const s = countStats(n.children); total += s.total; done += s.done; }
+  }
+  return {total, done};
+}
+function removeNode(nodes, id){
+  for(let i=0;i<nodes.length;i++){
+    if(nodes[i].id === id){ nodes.splice(i,1); return true; }
+    if(nodes[i].children && removeNode(nodes[i].children, id)) return true;
+  }
+  return false;
+}
+
+function render(){
+  const rootEl = document.getElementById('treeRoot');
+  const progressWrap = document.getElementById('progressWrap');
+  const stats = countStats(tree);
+
+  if(!tree.length){
+    progressWrap.style.display = 'none';
+    rootEl.innerHTML = '<div class="empty">Nothing here yet — write a brain dump above and hit Organize.</div>';
+    return;
+  }
+
+  progressWrap.style.display = 'block';
+  const pct = stats.total ? Math.round((stats.done/stats.total)*100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${stats.done} of ${stats.total} done`;
+
+  const ul = document.createElement('ul');
+  ul.className = 'tree';
+  ul.appendChild(renderChildren(tree));
+  rootEl.innerHTML = '';
+  rootEl.appendChild(ul);
+}
+
+function renderChildren(nodes){
+  const frag = document.createDocumentFragment();
+  for(const node of nodes) frag.appendChild(renderNode(node));
+  return frag;
+}
+
+function renderNode(node){
+  const li = document.createElement('li');
+  li.className = 'node';
+  const row = document.createElement('div');
+  row.className = 'node-row';
+
+  const hasChildren = node.children && node.children.length > 0;
+  const twisty = document.createElement('div');
+  twisty.className = 'twisty' + (hasChildren ? '' : ' leafless');
+  twisty.textContent = hasChildren ? (node.expanded ? '▾' : '▸') : '·';
+  twisty.onclick = () => { node.expanded = !node.expanded; saveTree(); render(); };
+  row.appendChild(twisty);
+
+  const checkbox = document.createElement('div');
+  checkbox.className = 'checkbox' + (node.checked ? ' checked' : '');
+  checkbox.textContent = node.checked ? '✓' : '';
+  checkbox.onclick = () => { node.checked = !node.checked; saveTree(); render(); };
+  row.appendChild(checkbox);
+
+  const textEl = document.createElement('div');
+  textEl.className = 'node-text' + (node.checked ? ' checked' : '');
+  textEl.contentEditable = true;
+  textEl.textContent = node.text;
+  textEl.onblur = () => { node.text = textEl.textContent.trim() || node.text; saveTree(); };
+  textEl.onkeydown = (e) => { if(e.key === 'Enter'){ e.preventDefault(); textEl.blur(); } };
+  row.appendChild(textEl);
+
+  const actions = document.createElement('div');
+  actions.className = 'node-actions';
+  const addChildBtn = document.createElement('button');
+  addChildBtn.className = 'icon-btn'; addChildBtn.title = 'Add sub-task'; addChildBtn.textContent = '+';
+  addChildBtn.onclick = () => { node.children = node.children || []; node.children.push(makeNode('new task')); node.expanded = true; saveTree(); render(); };
+  actions.appendChild(addChildBtn);
+  const delBtn = document.createElement('button');
+  delBtn.className = 'icon-btn'; delBtn.title = 'Delete'; delBtn.textContent = '×';
+  delBtn.onclick = () => { removeNode(tree, node.id); saveTree(); render(); };
+  actions.appendChild(delBtn);
+  row.appendChild(actions);
+
+  li.appendChild(row);
+  if(hasChildren && node.expanded){
+    const childUl = document.createElement('ul');
+    childUl.className = 'tree';
+    childUl.appendChild(renderChildren(node.children));
+    li.appendChild(childUl);
+  }
+  return li;
+}
+
+/* ---------------- Email gate ---------------- */
+
+function showGate(){ document.getElementById('gateOverlay').style.display = 'flex'; }
+function hideGate(){ document.getElementById('gateOverlay').style.display = 'none'; }
+
+function initEmailGate(){
+  const existing = getEmail();
+  if(existing){ hideGate(); refreshStatus(); } else { showGate(); }
+
+  document.getElementById('saveEmailBtn').onclick = () => {
+    const val = document.getElementById('emailInput').value.trim();
+    if(!val || !val.includes('@')){ alert('Enter a valid email'); return; }
+    localStorage.setItem(EMAIL_KEY, val);
+    hideGate();
+    refreshStatus();
+  };
+
+  document.getElementById('planPill').onclick = () => {
+    if(confirm('Switch to a different account? (Your saved tree stays on this device either way.)')){
+      localStorage.removeItem(EMAIL_KEY);
+      showGate();
+    }
+  };
+}
+
+/* ---------------- Plan status pill ---------------- */
+
+async function refreshStatus(){
+  const email = getEmail();
+  if(!email) return;
+  const pill = document.getElementById('planPill');
+  const pillText = document.getElementById('planPillText');
+  try{
+    const res = await fetch(BACKEND_BASE + '/status?email=' + encodeURIComponent(email));
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'status failed');
+
+    if(data.is_premium){
+      pill.classList.add('premium');
+      pillText.innerHTML = `Premium · <span class="num">${data.days_left}</span>d left`;
+    }else{
+      pill.classList.remove('premium');
+      pillText.innerHTML = `Free · <span class="num">${data.attempts_remaining}</span> left`;
+    }
+  }catch(e){
+    pillText.textContent = 'Untangle';
+  }
+}
+
+/* ---------------- Organize + Upgrade ---------------- */
+
+function setStatus(msg, showSpinner, isError){
+  const el = document.getElementById('status');
+  if(!msg){ el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.classList.toggle('error', !!isError);
+  el.innerHTML = (showSpinner ? '<div class="spinner"></div>' : '') + '<span>'+msg+'</span>';
+}
+
+async function organizeDump(){
+  const box = document.getElementById('dumpBox');
+  const text = box.value.trim();
+  if(!text) return;
+
+  const btn = document.getElementById('organizeBtn');
+  btn.disabled = true;
+  document.getElementById('upgradeBanner').style.display = 'none';
+  setStatus('sorting this out…', true, false);
+
+  try{
+    const response = await fetch(BACKEND_BASE + '/organize', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text, email: getEmail() })
+    });
+    const data = await response.json();
+
+    if(response.status === 402){
+      setStatus(data.message || "You've hit your free limit.", false, true);
+      document.getElementById('upgradeBanner').style.display = 'flex';
+      return;
+    }
+    if(!response.ok) throw new Error(data.error || 'Backend returned an error');
+
+    const newNodes = (data.nodes || []).map(p => makeNode(p.text, p.children));
+    tree = tree.concat(newNodes);
+    saveTree();
+    render();
+    box.value = '';
+    setStatus('added ' + newNodes.length + ' item' + (newNodes.length===1?'':'s'), false, false);
+    setTimeout(() => setStatus(null), 2200);
+    refreshStatus();
+  }catch(e){
+    console.error(e);
+    setStatus("couldn't reach the backend — is it running? (" + e.message + ")", false, true);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function upgrade(){
+  if(!RAZORPAY_PAYMENT_LINK || RAZORPAY_PAYMENT_LINK.includes('PASTE')){
+    alert('Payment link not set up yet — paste your Razorpay Payment Link into index.html first (see DEPLOYMENT.md).');
+    return;
+  }
+  alert('Important: on the Razorpay page, enter the SAME email you used here (' + getEmail() + ') so your account unlocks automatically after payment.');
+  window.open(RAZORPAY_PAYMENT_LINK, '_blank');
+}
+
+document.getElementById('organizeBtn').onclick = organizeDump;
+document.getElementById('upgradeBtn').onclick = upgrade;
+document.getElementById('addRootBtn').onclick = () => { tree.push(makeNode('new item')); saveTree(); render(); };
+document.getElementById('resetAllBtn').onclick = () => {
+  if(confirm('Clear everything? This cannot be undone.')){ tree = []; saveTree(); render(); }
+};
+
+loadTree();
+initEmailGate();
+</script>
+</body>
+</html>
