@@ -263,11 +263,11 @@
 <script>
 // 👇 PASTE YOUR RENDER URL HERE after deploying backend.py (see DEPLOYMENT.md)
 //    e.g. 'https://untangle-backend.onrender.com'  — no trailing slash
-const BACKEND_BASE = 'https://dailydobackendv6launch2.onrender.com';
+const BACKEND_BASE = 'http://localhost:5000';
 
 // 👇 PASTE YOUR RAZORPAY PAYMENT LINK HERE after creating it (see DEPLOYMENT.md)
 //    e.g. 'https://rzp.io/rzp/abcXYZ12'
-const RAZORPAY_PAYMENT_LINK = 'https://rzp.io/rzp/v2Zjwaw';
+const RAZORPAY_PAYMENT_LINK = 'PASTE_YOUR_RAZORPAY_PAYMENT_LINK_HERE';
 
 const STORAGE_KEY = 'untangleTree';
 const EMAIL_KEY = 'untangleEmail';
@@ -430,7 +430,7 @@ async function refreshStatus(){
       pillText.innerHTML = `Premium · <span class="num">${data.days_left}</span>d left`;
     }else{
       pill.classList.remove('premium');
-      pillText.innerHTML = `Free · <span class="num">${data.attempts_remaining}</span> left`;
+      pillText.innerHTML = `Free · <span class="num">${data.weekly_remaining}</span> left this week`;
     }
   }catch(e){
     pillText.textContent = 'Untangle';

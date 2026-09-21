@@ -31,11 +31,11 @@ The server listens on http://localhost:5000 and exposes:
     POST /organize
         body: {"text": "raw brain dump ...", "email": "user@example.com"}
         returns: {"nodes": [...]}  OR  402 + {"error": "free_limit_reached"} once a
-        free (non-premium) email has used its FREE_ATTEMPTS_LIMIT (see db.py)
+        free (non-premium) email has used its FREE_WEEKLY_LIMIT (see db.py)
 
     GET /status?email=user@example.com
-        returns: {"is_premium": bool, "attempts": int, "attempts_remaining": int|null,
-                   "end_date": "YYYY-MM-DD"|null, "days_left": int|null}
+        returns: {"is_premium": bool, "attempts": int, "weekly_attempts": int,
+                   "weekly_remaining": int|null, "end_date": "YYYY-MM-DD"|null, "days_left": int|null}
         The frontend calls this to show plan info without needing to attempt
         an organize first.
 
@@ -81,7 +81,7 @@ db.init_db()
 # "gemini-flash-latest" is an alias Google keeps pointed at their current
 # recommended flash-tier model, so you're less likely to get caught out by
 # a model being retired (which is what happened with a pinned version before).
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
@@ -165,7 +165,7 @@ def organize():
         if not db.is_allowed_to_organize(email):
             return jsonify({
                 "error": "free_limit_reached",
-                "message": f"You've used all {db.FREE_ATTEMPTS_LIMIT} free organizes on this account.",
+                "message": f"You've used all {db.FREE_WEEKLY_LIMIT} free organizes for this week.",
             }), 402
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
