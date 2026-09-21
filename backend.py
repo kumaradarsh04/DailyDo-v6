@@ -81,7 +81,7 @@ db.init_db()
 # "gemini-flash-latest" is an alias Google keeps pointed at their current
 # recommended flash-tier model, so you're less likely to get caught out by
 # a model being retired (which is what happened with a pinned version before).
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
 
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
