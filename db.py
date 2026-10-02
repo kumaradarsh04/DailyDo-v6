@@ -122,7 +122,7 @@ def init_sessions_table():
                     email TEXT NOT NULL,
                     created_at TIMESTAMPZ NOT NULL DEFAULT NOW(),
                     expires_at TIMESTAMPZ NOT NULL
-                )
+                );
                 """
             )
             conn.commit()
