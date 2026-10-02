@@ -117,7 +117,7 @@ def init_sessions_table():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                CREATE TABLE IF NOT EXISTS sessions2 (
+                CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY,
                     email TEXT NOT NULL,
                     created_at TIMESTAMPZ NOT NULL DEFAULT NOW(),
