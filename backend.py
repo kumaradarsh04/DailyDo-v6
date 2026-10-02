@@ -31,11 +31,11 @@ The server listens on http://localhost:5000 and exposes:
     POST /organize
         body: {"text": "raw brain dump ...", "email": "user@example.com"}
         returns: {"nodes": [...]}  OR  402 + {"error": "free_limit_reached"} once a
-        free (non-premium) email has used its FREE_WEEKLY_LIMIT (see db.py)
+        free (non-premium) email has used its FREE_ATTEMPTS_LIMIT (see db.py)
 
     GET /status?email=user@example.com
-        returns: {"is_premium": bool, "attempts": int, "weekly_attempts": int,
-                   "weekly_remaining": int|null, "end_date": "YYYY-MM-DD"|null, "days_left": int|null}
+        returns: {"is_premium": bool, "attempts": int, "attempts_remaining": int|null,
+                   "end_date": "YYYY-MM-DD"|null, "days_left": int|null}
         The frontend calls this to show plan info without needing to attempt
         an organize first.
 
@@ -55,32 +55,38 @@ The server listens on http://localhost:5000 and exposes:
 See DEPLOYMENT.md for setting up Supabase, the Payment Link, and the webhook.
 """
 
-import hashlib
-import hmac
-import json
+import db
+
 import os
 import re
-
+import hmac
+import json
+import psycopg
+import secrets
+import hashlib
 import requests
+
+from pydantic import BaseModel
+
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-import db
 
 app = Flask(__name__)
 CORS(app)  # allow index.html (opened as a local file or served separately) to call this
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")
 
 db.init_pool()
 db.init_db()
+db.init_sessions_table()
 
-# Pick whichever current Gemini model fits your budget/latency needs.
-# "gemini-flash-latest" is an alias Google keeps pointed at their current
-# recommended flash-tier model, so you're less likely to get caught out by
-# a model being retired (which is what happened with a pinned version before).
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
 
 GEMINI_URL = (
@@ -88,7 +94,11 @@ GEMINI_URL = (
     f"{GEMINI_MODEL}:generateContent"
 )
 
-PROMPT_TEMPLATE = """Convert this messy brain dump into a well-organized hierarchical task list. Group related tasks under short category headings when it makes sense (2-6 word headings), and break down vague or large tasks into 2-4 concrete sub-steps only when genuinely useful. Keep item text short and action-oriented. Do not invent unrelated tasks.
+PROMPT_TEMPLATE = """
+Convert this messy brain dump into a well-organized hierarchical task list. Group related tasks under
+short category headings when it makes sense (2-6 word headings), and break down vague or large tasks
+into 2-4 concrete sub-steps only when genuinely useful. Keep item text short and action-oriented.
+Do not invent unrelated tasks.
 
 Respond with ONLY a raw JSON array, no markdown fences, no commentary, in exactly this shape:
 [{{"text": "Category or task", "children": [{{"text": "sub task", "children": []}}]}}]
@@ -125,6 +135,115 @@ def normalize_nodes(nodes):
         clean.append({"text": text, "children": children})
     return clean
 
+@app.route("/auth/google", methods=["POST"])
+def google_login():
+
+    if not GOOGLE_CLIENT_ID:
+        return jsonify({
+            "error": "GOOGLE_CLIENT_ID is not configured"
+        }), 500
+
+    payload = request.get_json(silent=True) or {}
+
+    credential = payload.get("credential")
+
+    if not credential:
+        return jsonify({
+            "error": "No Google credential provided"
+        }), 400
+
+    try:
+        google_user = id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+
+    except ValueError:
+        return jsonify({
+            "error": "Invalid Google credential"
+        }), 401
+
+    email = google_user.get("email")
+
+    if not email:
+        return jsonify({
+            "error": "Google account has no email"
+        }), 400
+
+    email = email.strip().lower()
+
+    # Make sure this user exists in our existing users table.
+    db.get_status(email)
+
+    # Create our own application session.
+    session_id = secrets.token_urlsafe(32)
+
+    db.create_session(
+        session_id,
+        email
+    )
+
+    response = jsonify({
+        "success": True
+    })
+
+    response.set_cookie(
+        key="__Host-session",
+        value=session_id,
+        httponly=True,
+        secure=True,
+        samesite="Lax",
+        path="/",
+        max_age=60 * 60 * 24 * 30
+    )
+
+    return response
+
+@app.route("/auth/me", methods=["GET"])
+def auth_me():
+
+    session_id = request.cookies.get("__Host-session")
+
+    if not session_id:
+        return jsonify({
+            "authenticated": False
+        }), 401
+
+    email = db.get_session(session_id)
+
+    if not email:
+        return jsonify({
+            "authenticated": False
+        }), 401
+
+    status = db.get_status(email)
+
+    return jsonify({
+        "authenticated": True,
+        "email": email,
+        "is_premium": status["is_premium"],
+        "attempts_remaining": status["attempts_remaining"]
+    })
+
+@app.route("/auth/logout", methods=["POST"])
+def logout():
+
+    session_id = request.cookies.get("__Host-session")
+
+    if session_id:
+        db.delete_session(session_id)
+
+    response = jsonify({
+        "success": True
+    })
+
+    response.delete_cookie(
+        key="__Host-session",
+        path="/"
+    )
+
+    return response
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -165,7 +284,7 @@ def organize():
         if not db.is_allowed_to_organize(email):
             return jsonify({
                 "error": "free_limit_reached",
-                "message": f"You've used all {db.FREE_WEEKLY_LIMIT} free organizes for this week.",
+                "message": f"You've used all {db.FREE_ATTEMPTS_LIMIT} free organizes on this account.",
             }), 402
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
