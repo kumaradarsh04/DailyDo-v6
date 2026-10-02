@@ -126,7 +126,7 @@ def init_sessions_table():
                 """
             )
             conn.commit()
-    finally: _pool.putconn()
+    finally: _pool.putconn(conn)
 
 
 def create_session(session_id, email):
