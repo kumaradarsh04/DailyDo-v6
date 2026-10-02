@@ -61,7 +61,6 @@ import os
 import re
 import hmac
 import json
-import psycopg
 import secrets
 import hashlib
 import requests
