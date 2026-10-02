@@ -120,8 +120,8 @@ def init_sessions_table():
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY,
                     email TEXT NOT NULL,
-                    created_at TIMESTAMPZ NOT NULL DEFAULT NOW(),
-                    expires_at TIMESTAMPZ NOT NULL
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    expires_at TIMESTAMPTZ NOT NULL
                 );
                 """
             )
